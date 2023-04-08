@@ -61,7 +61,7 @@ void harvestCb(const std_msgs::Int8& command){
         harvest_rsp.data = 1;
         break;
       default:
-        harvest_rsp.data = 1;
+        harvest_rsp.data = 0;
         break;       
     }
 
