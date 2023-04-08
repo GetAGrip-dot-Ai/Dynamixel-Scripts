@@ -19,6 +19,14 @@ namespace MotorPos{
 
 }
 
+// params to tun for cutter
+namespace cut_params{
+
+  unsigned long CUTTER_DELAY = 3000;
+  int CUT_ATTEMPTS = 3;
+
+}
+
 // make the node handle and get the message types
 ros::NodeHandle  nh;
 
@@ -83,7 +91,7 @@ void harvestCb(const std_msgs::Int8& command){
         }
 
         break;
-        
+
       // open the gripper, then close both
       case 12:
         
