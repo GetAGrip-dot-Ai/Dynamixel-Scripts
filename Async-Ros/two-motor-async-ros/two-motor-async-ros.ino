@@ -34,35 +34,35 @@ ros::NodeHandle  nh;
 // 0 for error
 // 1 for Success
 std_msgs::Int8 harvest_rsp;
-ros::Publisher harvest_pub("harvest_result", &harvest_rsp);
+ros::Publisher harvest_pub("/end_effector/harvest_rsp", &harvest_rsp);
 
 // Subscriber to see action to take
 // 1 = Grip
 // 2 = Cut 
 // 3 = Release
 
-void harvestCb( const std_msgs::Int8& command);
+void harvestCallback( const std_msgs::Int8& command);
 
-ros::Subscriber<std_msgs::Int8> command_sub("harvest_command", harvestCb );
+ros::Subscriber<std_msgs::Int8> command_sub("/end_effector/harvest_req", harvestCb );
 
 // Need to track commands so we don't repeat executions
 int8_t last_commmand;
 
 // MX64 opening and closing
-void open_cutter(){
+void openCutter(){
   dx1.setGoalPosition(MX_64_ID, MotorPos:MX64_open, UNIT_DEGREE);
 }
 
-void close_cutter(){
+void closeCutter(){
   dx1.setGoalPosition(MX_64_ID, MotorPos:MX64_close, UNIT_DEGREE);
 }
 
 // mx28 opening and closing
-void open_gripper(){
+void openGripper(){
   dx1.setGoalPosition(MX_28_ID, MotorPos:MX28_open, UNIT_DEGREE);
 }
 
-void close_gripper(){
+void closeGripper(){
   dx1.setGoalPosition(MX_28_ID, MotorPos:MX28_close, UNIT_DEGREE);
 }
 
@@ -78,25 +78,25 @@ void harvestCb(const std_msgs::Int8& command){
 
       // Open gripper & cutter
       case 8:
-        open_gripper()
-        open_cutter()
+        openGripper()
+       openCutter()
 
-        harvest_rsp.data = 1;
+        harvest_rsp.data = 9;
         relevant_state = true;
         break;
 
       // extract: close gripper & cut 
       case 10:
 
-        close_gripper();
+        closeGripper();
 
         for(int i; i < cut_params::CUT_ATTEMPTS; i++){
-          close_cutter();
+          closeCutter();
           delay(cut_params::CUTTER_DELAY)
-          open_cutter();
+         openCutter();
         }
 
-        harvest_rsp.data = 1;
+        harvest_rsp.data = 11;
         relevant_state = true;
 
         break;
@@ -104,12 +104,12 @@ void harvestCb(const std_msgs::Int8& command){
       // open the gripper, then close both
       case 12:
         
-        open_gripper();
+        openGripper();
 
-        close_gripper();
-        close_cutter();          
+        closeGripper();
+        closeCutter();          
 
-        harvest_rsp.data = 1;
+        harvest_rsp.data = 13;
         relevant_state = true;
 
         break;
