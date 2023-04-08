@@ -69,6 +69,9 @@ void close_gripper(){
 // harvesting callback
 void harvestCb(const std_msgs::Int8& command){
 
+  // if the state is not 8, 10, 11 don't publish
+  bool relevant_state = false;
+
   if(command.data != last_commmand){
 
     switch(command.data){
@@ -77,6 +80,9 @@ void harvestCb(const std_msgs::Int8& command){
       case 8:
         open_gripper()
         open_cutter()
+
+        harvest_rsp.data = 1;
+        relevant_state = true;
         break;
 
       // extract: close gripper & cut 
@@ -90,6 +96,9 @@ void harvestCb(const std_msgs::Int8& command){
           open_cutter();
         }
 
+        harvest_rsp.data = 1;
+        relevant_state = true;
+
         break;
 
       // open the gripper, then close both
@@ -101,13 +110,16 @@ void harvestCb(const std_msgs::Int8& command){
         close_cutter();          
 
         harvest_rsp.data = 1;
+        relevant_state = true;
+
         break;
+
       default:
-        harvest_rsp.data = 0;
         break;       
     }
 
   }  
+
 
   harvest_pub.publish(&harvest_rsp);
 
