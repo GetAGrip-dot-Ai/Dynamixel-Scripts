@@ -81,7 +81,7 @@ void harvestCb(const std_msgs::Int8& command){
         openGripper()
        openCutter()
 
-        harvest_rsp.data = 9;
+        harvest_rsp.data = 1;
         relevant_state = true;
         break;
 
@@ -96,7 +96,7 @@ void harvestCb(const std_msgs::Int8& command){
          openCutter();
         }
 
-        harvest_rsp.data = 11;
+        harvest_rsp.data = 1;
         relevant_state = true;
 
         break;
