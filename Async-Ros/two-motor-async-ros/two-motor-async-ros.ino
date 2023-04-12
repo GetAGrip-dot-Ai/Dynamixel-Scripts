@@ -11,11 +11,11 @@ DynamixelShield dx1;
 // Positions to calibrate the motors to 
 namespace MotorPos{
 
-  float MX64_open = 100;
-  float MX64_close = 100;
+  float MX64_open = 220;
+  float MX64_close = 300;
 
-  float MX28_open = 100;
-  float MX28_close = 100;
+  float MX28_open = 190;
+  float MX28_close = 255;
 
 }
 
@@ -41,7 +41,7 @@ ros::Publisher harvest_pub("/end_effector/harvest_rsp", &harvest_rsp);
 // 2 = Cut 
 // 3 = Release
 
-void harvestCallback( const std_msgs::Int8& command);
+void harvestCb( const std_msgs::Int8& command);
 
 ros::Subscriber<std_msgs::Int8> command_sub("/end_effector/harvest_req", harvestCb );
 
@@ -50,39 +50,33 @@ int8_t last_commmand;
 
 // MX64 opening and closing
 void openCutter(){
-  dx1.setGoalPosition(MX_64_ID, MotorPos:MX64_open, UNIT_DEGREE);
+  dx1.setGoalPosition(MX_64_ID, MotorPos::MX64_open, UNIT_DEGREE);
 }
 
 void closeCutter(){
-  dx1.setGoalPosition(MX_64_ID, MotorPos:MX64_close, UNIT_DEGREE);
+  dx1.setGoalPosition(MX_64_ID, MotorPos::MX64_close, UNIT_DEGREE);
 }
 
 // mx28 opening and closing
 void openGripper(){
-  dx1.setGoalPosition(MX_28_ID, MotorPos:MX28_open, UNIT_DEGREE);
+  dx1.setGoalPosition(MX_28_ID, MotorPos::MX28_open, UNIT_DEGREE);
 }
 
 void closeGripper(){
-  dx1.setGoalPosition(MX_28_ID, MotorPos:MX28_close, UNIT_DEGREE);
+  dx1.setGoalPosition(MX_28_ID, MotorPos::MX28_close, UNIT_DEGREE);
 }
 
 // harvesting callback
 void harvestCb(const std_msgs::Int8& command){
 
-  // if the state is not 8, 10, 11 don't publish
-  bool relevant_state = false;
-
-  if(command.data != last_commmand){
-
-    switch(command.data){
+     switch(command.data){
 
       // Open gripper & cutter
       case 8:
-        openGripper()
-       openCutter()
+        openGripper();
+        openCutter();
 
         harvest_rsp.data = 1;
-        relevant_state = true;
         break;
 
       // extract: close gripper & cut 
@@ -90,15 +84,17 @@ void harvestCb(const std_msgs::Int8& command){
 
         closeGripper();
 
-        for(int i; i < cut_params::CUT_ATTEMPTS; i++){
+        delay(10000); // 10 second delay for debugging
+
+        for(int i=0; i < cut_params::CUT_ATTEMPTS; i++)
+        {
+          openCutter();
+          delay(1000);
           closeCutter();
-          delay(cut_params::CUTTER_DELAY)
-         openCutter();
+          delay(cut_params::CUTTER_DELAY); 
         }
 
         harvest_rsp.data = 1;
-        relevant_state = true;
-
         break;
 
       // open the gripper, then close both
@@ -106,25 +102,22 @@ void harvestCb(const std_msgs::Int8& command){
         
         openGripper();
 
+        delay(2000);
+
         closeGripper();
         closeCutter();          
 
-        harvest_rsp.data = 13;
-        relevant_state = true;
+        harvest_rsp.data = 1;
+        // relevant_state = true;
 
         break;
 
       default:
+        harvest_rsp.data = 0;
         break;       
     }
-
+      harvest_pub.publish(&harvest_rsp);
   }  
-
-
-  harvest_pub.publish(&harvest_rsp);
-
-}
-
 
 void setup() {
 
