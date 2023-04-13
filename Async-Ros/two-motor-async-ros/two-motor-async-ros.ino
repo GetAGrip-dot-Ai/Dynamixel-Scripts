@@ -1,10 +1,11 @@
 #include <DynamixelShield.h>
 #include <ros.h>
-#include <std_msgs/Int8.h>
+#include <std_msgs/Int16.h>
+#include <string.h>
 
 // Set up the motors: got these values from the wizard
-const uint8_t MX_64_ID = 1;
-const uint8_t MX_28_ID = 2;
+const uint8_t MX_64_ID = 2;
+const uint8_t MX_28_ID = 3;
 const float DX_PROTOCOL_VERSION = 1.0;  // same proto for both
 DynamixelShield dx1;
 
@@ -33,65 +34,240 @@ ros::NodeHandle  nh;
 // Publisher to see if the result goes well
 // 0 for error
 // 1 for Success
-std_msgs::Int8 harvest_rsp;
+std_msgs::Int16 harvest_rsp;
 ros::Publisher harvest_pub("/end_effector/harvest_rsp", &harvest_rsp);
+
+// create a publisher to publish the state
+std_msgs::Int16 state_msg;
+ros::Publisher state_pub("/end_effector/state", &state_msg);
+
 
 // Subscriber to see action to take
 // 1 = Grip
 // 2 = Cut 
 // 3 = Release
 
-void harvestCb( const std_msgs::Int8& command);
+void harvestCb( const std_msgs::Int16& command);
 
-ros::Subscriber<std_msgs::Int8> command_sub("/end_effector/harvest_req", harvestCb );
+ros::Subscriber<std_msgs::Int16> command_sub("/end_effector/harvest_req", harvestCb );
 
 // Need to track commands so we don't repeat executions
-int8_t last_commmand;
+int16_t last_commmand;
 
 // MX64 opening and closing
-void openCutter(){
-  dx1.setGoalPosition(MX_64_ID, MotorPos::MX64_open, UNIT_DEGREE);
+int openCutter(){
+
+  // sub 1 to the cutter closes state
+  update_state(-1);
+
+  if(dx1.setGoalPosition(MX_64_ID, MotorPos::MX64_open, UNIT_DEGREE)){
+    nh.loginfo("Cutter Opened");
+    return 1;
+  }
+  else{
+    nh.logwarn("Cutter Opening Failed");
+    return 0;
+   }  
 }
 
-void closeCutter(){
-  dx1.setGoalPosition(MX_64_ID, MotorPos::MX64_close, UNIT_DEGREE);
+int closeCutter(){
+
+  // add 1 to the cutter closes state
+  update_state(1);   
+           
+  if(dx1.setGoalPosition(MX_64_ID, MotorPos::MX64_close, UNIT_DEGREE)){
+    nh.loginfo("Cuttered Closed");
+    return 1;    
+  }
+  else{
+    nh.logwarn("Cutter Closing Failed");
+    return 0;
+  } 
 }
 
 // mx28 opening and closing
-void openGripper(){
-  dx1.setGoalPosition(MX_28_ID, MotorPos::MX28_open, UNIT_DEGREE);
+int openGripper(){
+
+  // sub 10 to the gripper closes state
+  update_state(-10); 
+
+  if(dx1.setGoalPosition(MX_28_ID, MotorPos::MX28_open, UNIT_DEGREE)){
+    nh.loginfo("Gripper Opened");  
+    return 1; 
+  }
+  else{
+    nh.logwarn("Gripper Opening Failed");
+    return 0;
+  }
 }
 
-void closeGripper(){
-  dx1.setGoalPosition(MX_28_ID, MotorPos::MX28_close, UNIT_DEGREE);
+int closeGripper(){
+
+  // adding ten changes from open to close
+  update_state(10);
+
+  if(dx1.setGoalPosition(MX_28_ID, MotorPos::MX28_close, UNIT_DEGREE)){
+    nh.loginfo("Gripper Closed");
+    return 1;
+  }
+  else{
+    nh.logwarn("Gripper Closing Failed");
+    return 0;
+  }
 }
+
+// motor resets
+void resetMotors(int attempts)
+{
+
+  // for all motors (id 2, 3)
+  for(int ID=2; ID<4; ID++)
+  {
+    // set the name for comms
+    String motor_name;
+    switch(ID){
+        case MX_64_ID:
+          motor_name = "MX-64";
+          break;
+        case MX_28_ID:
+          motor_name = "MX-28";
+          break;
+    }
+        
+    // try to reset the motor 10 times and see if it works
+    bool reset_success=false;
+    for(int j = 0; j < attempts; j++)
+      {
+      reset_success = dx1.factoryReset(ID, 0xFF, 10); // 10 second timeout
+      delay(50);
+      
+      if(reset_success){
+        nh.loginfo((String("Factory Reset of Motor ID ") + motor_name + String(" Successful")).c_str());
+        break;}
+      nh.logwarn((String("Factory Reset of Motor ID ") + motor_name + String(" Failed")).c_str());
+      }
+    
+    // after tring to reset, update the outcome then try to reset the id
+    delay(500);
+
+    // after trying to reset, need to reset the ID
+    bool reset_id=false;
+    if(reset_success)
+      {
+        for(int j = 0; j < attempts; j++)
+          {
+          reset_id = dx1.setID(1, ID);
+          delay(50);
+          if(reset_id){
+            nh.loginfo((String("ID Reset of ") + motor_name + String(" Successful")).c_str());
+            break;
+          }
+          nh.logwarn((String("ID Reset of ") + motor_name + String(" Failed")).c_str());
+          }
+      }
+
+    }
+  // Ping the motors as quick check
+  ping_motors();      
+}
+
+void ping_motors(){
+
+  if(dx1.ping(MX_64_ID)){
+      nh.loginfo((String("Pinning of ID ") + String(MX_64_ID)+String(" Successful")).c_str()); 
+  }
+  else{
+    nh.logwarn((String("Pinning of ID ") + String(MX_64_ID)+String(" Failed")).c_str());
+  }
+  
+  if(dx1.ping(MX_28_ID)){
+      nh.loginfo((String("Pinning of ID ") + String(MX_28_ID)+String(" Successful")).c_str()); 
+    }
+  else{
+    nh.logwarn((String("Pinning of ID ") + String(MX_28_ID)+String(" Failed")).c_str());
+  }  
+}
+
+void update_state(int change_val){
+  // State Table:
+  // 11 = Open Gripper || Open Cutter
+  // 12 = Open Gripper || Close Cutter
+  // 21 = Close Gripper || Open Cutter
+  // 22 = Close Gripper || Close Cutter
+  
+  switch(state_msg.data){
+    case 11: 
+      // open gripper -> close gripper OR open cutter -> close cutter
+      if(change_val == 10 || change_val == 1){
+        state_msg.data += change_val;
+      }
+      break;
+    case 12:
+      // open gripper -> close gripper OR close cutter -> open cutter
+      if(change_val == 10 || change_val == -1){
+        state_msg.data += change_val;
+      }
+      break;
+    case 21:
+      // close gripper -> open gripper OR open cutter -> close cutter
+      if(change_val == -10 || change_val == 1){
+        state_msg.data += change_val;
+      }
+      break;
+    case 22:
+      // close gripper -> open gripper OR close cutter -> open cutter
+      if(change_val == -10 || change_val == -1){
+        state_msg.data += change_val;
+      }  
+      break;
+  }
+}
+
 
 // harvesting callback
-void harvestCb(const std_msgs::Int8& command){
+void harvestCb(const std_msgs::Int16& command){
 
      switch(command.data){
-
       // Open gripper & cutter
       case 8:
-        openGripper();
-        openCutter();
 
-        harvest_rsp.data = 1;
+        if(!openGripper()){
+          harvest_rsp.data = 0;
+          break;
+        }    
+        
+        delay(500);
+
+        if(!openCutter()){
+          harvest_rsp.data = 0;
+          break;
+        } 
+        
+        harvest_rsp.data = 0;
         break;
-
       // extract: close gripper & cut 
       case 10:
 
-        closeGripper();
+        if(!closeGripper()){
+          harvest_rsp.data = 0;
+          break;
+        }
 
-        delay(10000); // 10 second delay for debugging
-
+        // attempt some number of times
         for(int i=0; i < cut_params::CUT_ATTEMPTS; i++)
         {
-          openCutter();
-          delay(1000);
-          closeCutter();
+          if(!closeCutter()){
+            harvest_rsp.data = 0;
+            break;
+          }
+          
           delay(cut_params::CUTTER_DELAY); 
+
+          if(!openCutter()){
+            harvest_rsp.data = 0;
+            break;
+          }
+        
         }
 
         harvest_rsp.data = 1;
@@ -100,21 +276,76 @@ void harvestCb(const std_msgs::Int8& command){
       // open the gripper, then close both
       case 12:
         
-        openGripper();
+        if(!openGripper()){
+          harvest_rsp.data = 0;
+          break;
+        } 
+        
+        delay(500);
 
-        delay(2000);
+        if(!closeGripper()){
+          harvest_rsp.data = 0;
+          break;
+        }
 
-        closeGripper();
-        closeCutter();          
+        if(!closeCutter()){
+            harvest_rsp.data = 0;
+            break;
+        }
 
         harvest_rsp.data = 1;
-        // relevant_state = true;
 
         break;
 
+      // factory reset
+      case 20:
+        harvest_rsp.data = 1;
+        resetMotors(10);
+        break;                   
+      
+      case 21:
+        ping_motors();
+        harvest_rsp.data = 1;
+        break;
+
+      // other base functionalities
+      case 22: // opening gripper
+         if(!openGripper()){
+          harvest_rsp.data = 0;
+          break;
+        } 
+        harvest_rsp.data = 1;
+        break;
+
+      case 23: // opening cutter
+        if(!openCutter()){
+            harvest_rsp.data = 0;
+            break;
+        } 
+        harvest_rsp.data = 1;
+        break;
+      
+      case 24:
+        if(!closeGripper()){ // closing gripper
+          harvest_rsp.data = 0;
+          break;
+        } 
+        harvest_rsp.data = 1;
+        break;
+      
+      case 25: // closing cutter
+        if(!closeCutter()){
+          harvest_rsp.data = 0;
+          break;
+        } 
+        harvest_rsp.data = 1;
+        break;
+
       default:
+        nh.logwarn("You have given an incorrect request to the end-effector");
         harvest_rsp.data = 0;
-        break;       
+        break; 
+ 
     }
       harvest_pub.publish(&harvest_rsp);
   }  
@@ -129,9 +360,14 @@ void setup() {
 
   nh.advertise(harvest_pub);
   nh.subscribe(command_sub);
+  nh.advertise(state_pub);
 
   //same protocol for both motors
   dx1.setPortProtocolVersion(DX_PROTOCOL_VERSION);
+
+  dx1.begin(57600);  // mx family baud rate
+
+  delay(500);
 
   // set up MX-64
   dx1.ping(MX_64_ID);
@@ -145,12 +381,18 @@ void setup() {
   dx1.setOperatingMode(MX_28_ID, OP_POSITION);
   dx1.torqueOn(MX_28_ID);
 
-  dx1.begin(57600);  // mx family baud rate
+  // close the gripper and cutter 
+  int start = closeGripper();
+  start = closeCutter();
 
+  state_msg.data = 22;
+      
 }
 
 void loop()
 {
   nh.spinOnce();
   delay(10);
+  state_pub.publish(&state_msg);
 }
+
