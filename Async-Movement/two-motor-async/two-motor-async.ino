@@ -27,8 +27,8 @@
 #endif
 
 // Set up the motors: got these values from the wizard
-const uint8_t MX_64_ID = 1;
-const uint8_t MX_28_ID = 2;
+const uint8_t MX_64_ID = 2;
+const uint8_t MX_28_ID = 3;
 const float DX_PROTOCOL_VERSION = 1.0; // same proto for both
 DynamixelShield dx1;
 
@@ -58,16 +58,22 @@ void setup() {
 }
 
 void loop() {
- 
+  
+  dx1.ledOn(MX_64_ID);
   dx1.setGoalPosition(MX_64_ID, 90, UNIT_DEGREE);
-  delay(1000);
+  delay(1000);  
   dx1.setGoalPosition(MX_64_ID, 180, UNIT_DEGREE);
   delay(1000);
-
-   
+  
+  
+  dx1.ledOn(MX_28_ID);
   dx1.setGoalPosition(MX_28_ID, 90, UNIT_DEGREE);
-  delay(1000);
+  delay(1000); 
   dx1.setGoalPosition(MX_28_ID, 180, UNIT_DEGREE);
+  delay(1000);
+  dx1.ledOff(MX_28_ID);
+
+  dx1.ledOff(MX_64_ID);
   delay(1000);
 
 }

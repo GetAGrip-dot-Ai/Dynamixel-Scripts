@@ -12,11 +12,11 @@ DynamixelShield dx1;
 // Positions to calibrate the motors to 
 namespace MotorPos{
 
-  float MX64_open = 220;
-  float MX64_close = 300;
+  float MX64_open = 180;
+  float MX64_close = 240;
 
-  float MX28_open = 190;
-  float MX28_close = 255;
+  float MX28_open = 140;
+  float MX28_close = 194;
 
 }
 
@@ -229,7 +229,7 @@ void harvestCb(const std_msgs::Int16& command){
 
      switch(command.data){
       // Open gripper & cutter
-      case 8:
+      case 4:
 
         if(!openGripper()){
           harvest_rsp.data = 0;
@@ -243,10 +243,10 @@ void harvestCb(const std_msgs::Int16& command){
           break;
         } 
         
-        harvest_rsp.data = 0;
+        harvest_rsp.data = 1;
         break;
       // extract: close gripper & cut 
-      case 10:
+      case 6:
 
         if(!closeGripper()){
           harvest_rsp.data = 0;
@@ -267,6 +267,8 @@ void harvestCb(const std_msgs::Int16& command){
             harvest_rsp.data = 0;
             break;
           }
+
+          delay(1000);
         
         }
 
@@ -274,7 +276,7 @@ void harvestCb(const std_msgs::Int16& command){
         break;
 
       // open the gripper, then close both
-      case 12:
+      case 8:
         
         if(!openGripper()){
           harvest_rsp.data = 0;
@@ -300,7 +302,7 @@ void harvestCb(const std_msgs::Int16& command){
       // factory reset
       case 20:
         harvest_rsp.data = 1;
-        resetMotors(10);
+        resetMotors(10); // 10 attempts to reset
         break;                   
       
       case 21:
