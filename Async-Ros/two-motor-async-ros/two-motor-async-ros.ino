@@ -61,11 +61,11 @@ int openCutter(){
   update_state(-1);
 
   if(dx1.setGoalPosition(MX_64_ID, MotorPos::MX64_open, UNIT_DEGREE)){
-    nh.loginfo("Cutter Opened");
+    nh.loginfo("Cutter Opening Command Sent");
     return 1;
   }
   else{
-    nh.logwarn("Cutter Opening Failed");
+    nh.logwarn("Cutter Opening Command Not Sent");
     return 0;
    }  
 }
@@ -76,11 +76,11 @@ int closeCutter(){
   update_state(1);   
            
   if(dx1.setGoalPosition(MX_64_ID, MotorPos::MX64_close, UNIT_DEGREE)){
-    nh.loginfo("Cuttered Closed");
+    nh.loginfo("Cuttered Closing Command Sent");
     return 1;    
   }
   else{
-    nh.logwarn("Cutter Closing Failed");
+    nh.logwarn("Cutter Closing Command Not Sent");
     return 0;
   } 
 }
@@ -92,11 +92,11 @@ int openGripper(){
   update_state(-10); 
 
   if(dx1.setGoalPosition(MX_28_ID, MotorPos::MX28_open, UNIT_DEGREE)){
-    nh.loginfo("Gripper Opened");  
+    nh.loginfo("Gripper Opening Command Sent");  
     return 1; 
   }
   else{
-    nh.logwarn("Gripper Opening Failed");
+    nh.logwarn("Gripper Opening Command Not Sent");
     return 0;
   }
 }
@@ -107,13 +107,51 @@ int closeGripper(){
   update_state(10);
 
   if(dx1.setGoalPosition(MX_28_ID, MotorPos::MX28_close, UNIT_DEGREE)){
-    nh.loginfo("Gripper Closed");
+    nh.loginfo("Gripper Closing Command Sent");
     return 1;
   }
   else{
-    nh.logwarn("Gripper Closing Failed");
+    nh.logwarn("Gripper Closing Command Not Sent");
     return 0;
   }
+}
+
+// figure out if the motors have been opened properly
+int checkOpenGripper(){
+
+  int threshold = 5;
+  int current_pos = dx1.getPresentPosition(MX_28_ID, UNIT_DEGREE);
+
+  int diff = abs(current_pos - MotorPos::MX28_open);
+
+  if(diff>threshold){
+    nh.logwarn("Gripper Not Opened");
+    return 0;
+    }
+  else{
+    nh.loginfo("Gripper Opened");
+    return 1;
+    }
+
+}
+
+// figure out if the motors have been opened properly
+int checkOpenCutter(){
+
+  int threshold = 5;
+  int current_pos = dx1.getPresentPosition(MX_64_ID, UNIT_DEGREE);
+
+  int diff = abs(current_pos - MotorPos::MX64_open);
+
+  if(diff>threshold){
+    nh.logwarn("Cutter Not Opened");
+    return 0;
+    }
+  else{
+    nh.loginfo("Cutter Opened");
+    return 1;
+    }
+
 }
 
 // motor resets
@@ -231,17 +269,31 @@ void harvestCb(const std_msgs::Int16& command){
       // Open gripper & cutter
       case 4:
 
+        // checking if the command sent is successful
         if(!openGripper()){
           harvest_rsp.data = 0;
           break;
-        }    
+        }  
+
+        // seeing if it is actually open
+        if(!checkOpenGripper()){
+          harvest_rsp.data = 0;
+          break;
+        }  
         
         delay(500);
 
+        // checking if the command sent is successful
         if(!openCutter()){
           harvest_rsp.data = 0;
           break;
         } 
+
+        // seeing if it is actually open
+        if(!checkOpenGripper()){
+          harvest_rsp.data = 0;
+          break;
+        }  
         
         harvest_rsp.data = 1;
         break;
@@ -279,6 +331,12 @@ void harvestCb(const std_msgs::Int16& command){
       case 8:
         
         if(!openGripper()){
+          harvest_rsp.data = 0;
+          break;
+        } 
+
+        // CRUCIAL: IF THE GRIPPER IS GRIPPED BUT NOT DROPPED
+        if(!checkOpenGripper()){
           harvest_rsp.data = 0;
           break;
         } 

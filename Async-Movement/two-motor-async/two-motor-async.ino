@@ -59,7 +59,6 @@ void setup() {
 
 void loop() {
   
-  dx1.ledOn(MX_64_ID);
   dx1.setGoalPosition(MX_64_ID, 90, UNIT_DEGREE);
   delay(1000);  
   dx1.setGoalPosition(MX_64_ID, 180, UNIT_DEGREE);
