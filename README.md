@@ -4,8 +4,8 @@
 
 **Description:** Using the Dynamixel Shield SDK developed by Robotis [link](https://emanual.robotis.com/docs/en/parts/interface/dynamixel_shield/), actuates two motors that are chained together between two seperate goal points using position control. This mimics the behavior of opening and closing an end-effector. 
 
-**Visualization:**
-![moving-motors]()
+**Visualization:**<br>
+![moving-motors](https://github.com/artrela/Dynamixel-Scripts/blob/main/Resources/ezgif.com-resize.gif)
 
 **Required Resources:**
 - Arduino (Mega or Uno)
