@@ -1,3 +1,12 @@
+/*
+CMU MRSD Program: Course 16-681
+Team Name: GetAGrip.AI
+Team Members: Alec Trela, Jiyoon Park, Sridevi Kaza, Solomon Fenton, & Shri Ishwarya S V
+Rev0: March. 17, 2023
+Code Description: Script to actuate the PEGASUS end-effector using rosserial
+*/
+
+
 #include <DynamixelShield.h>
 #include <ros.h>
 #include <std_msgs/Int16.h>
@@ -12,11 +21,11 @@ DynamixelShield dx1;
 // Positions to calibrate the motors to 
 namespace MotorPos{
 
-  float MX64_open = 180;
-  float MX64_close = 240;
+  float MX64_open = 67;
+  float MX64_close = 185;
 
-  float MX28_open = 140;
-  float MX28_close = 194;
+  float MX28_open = 90;
+  float MX28_close = 150;
 
 }
 
@@ -155,9 +164,10 @@ int checkOpenCutter(){
 }
 
 // motor resets
-void resetMotors(int attempts)
+bool resetMotors(int attempts)
 {
-
+  bool reset_success;
+  bool reset_id;
   // for all motors (id 2, 3)
   for(int ID=2; ID<4; ID++)
   {
@@ -173,7 +183,7 @@ void resetMotors(int attempts)
     }
         
     // try to reset the motor 10 times and see if it works
-    bool reset_success=false;
+    reset_success=false;
     for(int j = 0; j < attempts; j++)
       {
       reset_success = dx1.factoryReset(ID, 0xFF, 10); // 10 second timeout
@@ -181,32 +191,44 @@ void resetMotors(int attempts)
       
       if(reset_success){
         nh.loginfo((String("Factory Reset of Motor ID ") + motor_name + String(" Successful")).c_str());
-        break;}
-      nh.logwarn((String("Factory Reset of Motor ID ") + motor_name + String(" Failed")).c_str());
+        break;
       }
+      
+      nh.logwarn((String("Factory Reset of Motor ID ") + motor_name + String(" Failed")).c_str());
+
+      }
+  
     
     // after tring to reset, update the outcome then try to reset the id
     delay(500);
 
     // after trying to reset, need to reset the ID
-    bool reset_id=false;
     if(reset_success)
       {
         for(int j = 0; j < attempts; j++)
           {
           reset_id = dx1.setID(1, ID);
           delay(50);
-          if(reset_id){
-            nh.loginfo((String("ID Reset of ") + motor_name + String(" Successful")).c_str());
-            break;
-          }
+          if(reset_id)
+            {
+              nh.loginfo((String("ID Reset of ") + motor_name + String(" Successful")).c_str());           
+              
+            }
+          
           nh.logwarn((String("ID Reset of ") + motor_name + String(" Failed")).c_str());
+
           }
       }
-
+    
     }
   // Ping the motors as quick check
-  ping_motors();      
+  ping_motors(); 
+  if(reset_id && reset_success){
+    return true;
+  } 
+  else{
+    return false;
+  }
 }
 
 void ping_motors(){
@@ -265,10 +287,12 @@ void update_state(int change_val){
 // harvesting callback
 void harvestCb(const std_msgs::Int16& command){
 
-     switch(command.data){
-      // Open gripper & cutter
-      case 4:
+    nh.loginfo("Received a Request...");
 
+    switch(command.data){
+      
+      // Open gripper & cutter
+      case 4:{
         // checking if the command sent is successful
         if(!openGripper()){
           harvest_rsp.data = 0;
@@ -296,10 +320,10 @@ void harvestCb(const std_msgs::Int16& command){
         }  
         
         harvest_rsp.data = 1;
-        break;
+        break;        
+      }        
       // extract: close gripper & cut 
-      case 6:
-
+      case 6:{
         if(!closeGripper()){
           harvest_rsp.data = 0;
           break;
@@ -320,16 +344,27 @@ void harvestCb(const std_msgs::Int16& command){
             break;
           }
 
+          // CRUCIAL: IF THE GRIPPER IS GRIPPED BUT NOT DROPPED
+          if(!checkOpenGripper()){
+            harvest_rsp.data = 0;
+            break;
+          } 
+
           delay(1000);
         
         }
 
+        if(!closeCutter()){
+            harvest_rsp.data = 0;
+            break;
+        }
+
         harvest_rsp.data = 1;
         break;
+      }
 
       // open the gripper, then close both
-      case 8:
-        
+      case 8:{
         if(!openGripper()){
           harvest_rsp.data = 0;
           break;
@@ -348,67 +383,76 @@ void harvestCb(const std_msgs::Int16& command){
           break;
         }
 
-        if(!closeCutter()){
-            harvest_rsp.data = 0;
-            break;
-        }
-
         harvest_rsp.data = 1;
 
         break;
-
+      }
+        
       // factory reset
-      case 20:
-        harvest_rsp.data = 1;
-        resetMotors(10); // 10 attempts to reset
-        break;                   
-      
-      case 21:
+      case 20:{
+        bool reset = resetMotors(10); // 10 attempts to reset
+        if(reset){
+          harvest_rsp.data = 1;
+        }
+        else{
+          harvest_rsp.data = 0;
+        }       
+                
+        break;
+      }
+                           
+      case 21:{
         ping_motors();
         harvest_rsp.data = 1;
         break;
-
+      }
+        
       // other base functionalities
-      case 22: // opening gripper
-         if(!openGripper()){
+      case 22:{
+        // opening gripper
+        if(!openGripper()){
           harvest_rsp.data = 0;
           break;
         } 
         harvest_rsp.data = 1;
         break;
-
-      case 23: // opening cutter
+      } 
+      case 23:{
+        // opening cutter
         if(!openCutter()){
             harvest_rsp.data = 0;
             break;
         } 
         harvest_rsp.data = 1;
         break;
-      
-      case 24:
+      }
+      case 24:{
         if(!closeGripper()){ // closing gripper
           harvest_rsp.data = 0;
           break;
         } 
         harvest_rsp.data = 1;
         break;
-      
-      case 25: // closing cutter
+      }
+      case 25:{
+        // closing cutter
         if(!closeCutter()){
           harvest_rsp.data = 0;
           break;
         } 
         harvest_rsp.data = 1;
         break;
-
-      default:
+      }
+      default:{
         nh.logwarn("You have given an incorrect request to the end-effector");
         harvest_rsp.data = 0;
-        break; 
+        break;
+      }   
  
     }
       harvest_pub.publish(&harvest_rsp);
   }  
+    
 
 void setup() {
 
@@ -446,6 +490,8 @@ void setup() {
   start = closeCutter();
 
   state_msg.data = 22;
+
+  nh.loginfo("Starting up...");
       
 }
 
