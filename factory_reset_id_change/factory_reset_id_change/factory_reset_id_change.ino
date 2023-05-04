@@ -1,3 +1,11 @@
+/*
+CMU MRSD Program: Course 16-681
+Team Name: GetAGrip.AI
+Team Members: Alec Trela, Jiyoon Park, Sridevi Kaza, Solomon Fenton, & Shri Ishwarya S V
+Rev0: April. 5, 2023
+Code Description: Debugging script used to factory reset and change the ID of a dynamixel motor, with UART soft-serial verification
+*/
+
 #include <DynamixelShield.h>
 
 #if defined(ARDUINO_AVR_UNO) || defined(ARDUINO_AVR_MEGA2560)
